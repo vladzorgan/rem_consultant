@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:2.11
+    command:
+      --providers.docker=true
+      --providers.docker.exposedByDefault=false
+      --entryPoints.http.address=:80
+    ports:
+      - "80:80"
+      - "8082:8082"
+    networks:
+      - traefik-public
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+
+#  bot_consultant:
+#    build: ./bot_consultant
+#    container_name: bot_consultant
+#    volumes:
+#      - ./bot_consultant:/app
+#    restart: always
+#    networks:
+#      - traefik-public
+#      - default
+#    labels:
+#      - traefik.enable=true
+#      - traefik.docker.network=traefik-public
+#      - traefik.http.routers.bot_consultant.rule=Host(`bot_consultant.localhost`)
+#      - traefik.http.routers.bot_consultant.entryPoints=http
+#      - traefik.http.services.bot_consultant.loadBalancer.server.port=80
+#    ports:
+#      - "9100:9100"
+#    depends_on:
+#      - api
+
+  api:
+    build: ./api
+    container_name: api
+    volumes:
+      - ./api:/app
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://root:password@db:5432/repair_price_bot
+    networks:
+      - traefik-public
+      - default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.api.rule=Host(`api.localhost`)
+      - traefik.http.routers.api.entryPoints=http
+      - traefik.http.services.api.loadBalancer.server.port=80
+    ports:
+      - "8080:8080"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+
+#  pedant_scraper:
+#    build: ./pedant_scraper
+#    container_name: pedant_scraper
+#    volumes:
+#      - ./web_scraper:/app
+#    networks:
+#      - traefik-public
+#      - default
+#    labels:
+#      - traefik.enable=true
+#      - traefik.docker.network=traefik-public
+#      - traefik.http.routers.pedant_scraper.rule=Host(`pedant_scraper.localhost`)
+#      - traefik.http.routers.pedant_scraper.entryPoints=http
+#      - traefik.http.services.pedant_scraper.loadBalancer.server.port=80
+#    ports:
+#      - "1000:1000"
+
+  db:
+    image: postgres:13
+    container_name: postgres_db
+    restart: always
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=repair_price_bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  traefik-public:
+    name: traefik-public
